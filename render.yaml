@@ -1,7 +1,12 @@
 services:
   - type: web
-    name: consolation
+    name: consolation-api
     env: python
-    plan: free   # 免费层
+    plan: free
+    region: oregon       # 或者 frankfurt 等，随你
+    autoDeploy: true
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn app:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false      # 在 Render 仪表板里填值（不会从 repo 读取）
