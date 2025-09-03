@@ -21,7 +21,7 @@ def _init_openai_client() -> Optional[OpenAI]:
 # Lazily-initialized client; may be None in test environments without API key
 client: Optional[OpenAI] = _init_openai_client()
 
-app = FastAPI(title="Comfort API (OpenAI SDK)")
+app = FastAPI(title="Philosophy Comfort API (OpenAI SDK)")
 
 # Change to your GitHub Pages domain (user page and/or project page)
 ALLOWED_ORIGINS = [
@@ -39,7 +39,10 @@ app.add_middleware(
 class ComfortQuery(BaseModel):
     language: str = "zh"
     situation: str
-    faith_background: Optional[str] = "christian"
+    # New preferred field; kept alongside legacy 'faith_background' for compatibility
+    philosophy_background: Optional[str] = "stoicism"
+    # Legacy input kept for compatibility; ignored if philosophy_background is provided
+    faith_background: Optional[str] = None
     max_passages: int = 3
     guidance: Optional[str] = ""
 
@@ -51,8 +54,8 @@ class Passage(BaseModel):
 
 class ComfortResponse(BaseModel):
     passages: List[Passage]
-    devotional: str
-    prayer: str
+    reflection: str
+    exercise: str
     disclaimer: str
 
 class TTSRequest(BaseModel):
@@ -61,32 +64,32 @@ class TTSRequest(BaseModel):
     voice: Optional[str] = None  # if None, pick by language
     format: Optional[str] = "mp3"  # mp3 or wav
 
-SYSTEM_PROMPT = """You are a gentle Christian pastoral counselor and Bible study helper.
-You MUST respond STRICTLY in the user's requested language (zh for Chinese, en for English).
-DO NOT mix languages. All output, including Bible references, must be in the selected language.
-Propose Bible passages (book chapter:verse), fitting the user's situation.
-For quotes: provide at most a very short paraphrase (<= 20 words/chars) or leave empty.
-Write a longer pastoral devotional (300-500 zh characters / 300-400 English words) and a prayer (4-8 sentences).
-Avoid doctrinal disputes, be comforting and practical.
-Return STRICT JSON only, matching the schema the user supplies.
-If unsure about an exact verse, choose one you are confident in.
-Do NOT include long verbatim quotes from copyrighted translations.
+SYSTEM_PROMPT = """You are a calm philosophical counselor focusing on Stoicism and the ideas discussed in 'The Consolations of Philosophy' by Alain de Botton.
+You MUST respond STRICTLY in the user's requested language (zh for Chinese, en for English) and DO NOT mix languages.
+Recommend relevant philosophical passages primarily from public-domain Stoic sources (e.g., Marcus Aurelius' Meditations, Epictetus' Enchiridion/Discourses, Seneca's Letters to Lucilius, Cicero, Diogenes Laertius) and concepts from 'The Consolations of Philosophy'.
+For 'The Consolations of Philosophy': DO NOT include copyrighted verbatim quotes; summarize or paraphrase ideas instead.
+For quotes from Stoic sources: provide only very short public-domain snippets or short paraphrases (<= 20 words/chars) to respect length limits; longer material should go into full_passage_text only if it is public domain.
+Write a practical, compassionate philosophical reflection (300-500 zh characters / 300-400 English words) and provide a short step-by-step Stoic exercise (4-8 sentences) such as negative visualization, dichotomy of control, view-from-above, journaling prompts, or virtue rehearsal.
+Avoid sectarian or religious framing; focus on agency, clarity, and emotional steadiness.
+Return STRICT JSON only, matching exactly the schema the user supplies.
+If unsure about exact sections, choose ones you are confident in and clearly name the work and section (e.g., "Meditations 2.1").
+Do NOT include long verbatim quotes from copyrighted sources; for non-public-domain texts, summarize instead.
 """
 
 USER_PROMPT_TMPL = """User language: {language}
-Faith background: {faith_background}
+Philosophical background: {background}
 Situation detail: {situation}
 Additional guidance: {guidance}
 
 Return JSON with fields:
 - passages: array of at most {max_passages} objects with fields:
-  - ref (string, e.g., "Psalm 46:1-3" or "诗篇 46:1-3")
-  - short_quote (string, <= 20 words/chars; a paraphrase or public-domain-short snippet; MAY be empty)
+  - ref (string, e.g., "Meditations 2.1", "Enchiridion 1", "Seneca, Letters to Lucilius 13")
+  - short_quote (string, <= 20 words/chars; a paraphrase or a short public-domain snippet; MAY be empty)
   - reason (string, 1-2 sentences why this fits)
-  - full_passage_text (string, the full text of the passage from a public domain version. Use WEB (World English Bible) if user language is English, use CUV (Chinese Union Version) if user language is 中文)
-- devotional: a 300-500 {lang_unit} pastoral reflection applying these passages to the user's situation.
-- prayer: 4-8 sentences prayer.
-- disclaimer: one sentence kindly asking the user to verify in their preferred translation.
+  - full_passage_text (string, the full text ONLY if the passage is in the public domain in the requested language; otherwise provide a faithful paraphrase and clearly name the source work)
+- reflection: a 300-500 {lang_unit} philosophical reflection applying these ideas to the user's situation, emphasizing Stoic practices and practical wisdom.
+- exercise: 4-8 sentences describing a concrete Stoic practice or protocol (e.g., dichotomy of control steps, journaling prompts, or view-from-above) suitable for immediate use.
+- disclaimer: one sentence inviting the user to verify the passage in their preferred edition/translation and noting that copyrighted texts are summarized.
 
 Use the requested language for everything.
 """
@@ -95,7 +98,7 @@ def build_messages(q: ComfortQuery) -> List[Dict[str, str]]:
     lang_unit = "characters" if q.language.startswith("zh") else "words"
     uprompt = USER_PROMPT_TMPL.format(
         language=q.language,
-        faith_background=q.faith_background or "christian",
+        background=(getattr(q, "philosophy_background", None) or q.faith_background or "stoicism"),
         situation=q.situation,
         guidance=q.guidance or "None",
         max_passages=max(1, min(q.max_passages, 10)),
@@ -143,14 +146,12 @@ def get_comfort_from_openai(q: ComfortQuery, *, openai_client: Optional[OpenAI] 
         data["passages"] = passages
 
         # Ensure other required fields have default values if missing from LLM response
-        data.setdefault("devotional", "")
-        data.setdefault("prayer", "")
+        data.setdefault("reflection", "")
+        data.setdefault("exercise", "")
 
         if not data.get("disclaimer"):
             data["disclaimer"] = (
-                "请在你常用的圣经译本中核对经文原文与上下文；以上解读仅作灵修参考。"
-                if q.language.startswith("zh")
-                else "Please verify these references in your preferred Bible translation; the reflection is for devotional support."
+                "Please verify passages in your preferred edition/translation; non-public-domain texts are summarized, and this is supportive guidance only."
             )
         
         return data
