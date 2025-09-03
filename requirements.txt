@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+python-dateutil
+pydantic
+openai>=1.0.0
+python-dotenv

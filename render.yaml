@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: consolation
+    env: python
+    plan: free   # 免费层
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app:app --host 0.0.0.0 --port $PORT"
