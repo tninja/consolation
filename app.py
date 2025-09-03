@@ -40,17 +40,9 @@ class ComfortQuery(BaseModel):
     language: str = "zh"
     situation: str
     philosophy_background: Optional[str] = "philosophy"
-    max_passages: int = 3
     guidance: Optional[str] = ""
 
-class Passage(BaseModel):
-    ref: str
-    short_quote: str
-    reason: str
-    full_passage_text: str
-
 class ComfortResponse(BaseModel):
-    passages: List[Passage]
     reflection: str
     exercise: str
     disclaimer: str
@@ -80,14 +72,9 @@ Situation detail: {situation}
 Additional guidance: {guidance}
 
 Return JSON with fields:
-- passages: array of at most {max_passages} objects with fields:
-  - ref (string, e.g., "Meditations 2.1", "Enchiridion 1", "Aristotle, Nicomachean Ethics I–II (eudaimonia/virtue)", "Epicurus, Letter to Menoeceus (ataraxia)", "Montaigne, Essays I.20", "de Botton, The Consolations of Philosophy — Chapter X (summary)")
-  - short_quote (string, <= 20 words/chars; a paraphrase or a short snippet; MAY be empty)
-  - reason (string, 1-2 sentences why this fits)
-  - full_passage_text (string, if public-domain in the requested language you may include brief original text; otherwise provide a faithful paraphrase and clearly name the source work)
-- reflection: a 300-500 {lang_unit} philosophical reflection applying these ideas to the user's situation, emphasizing practical wisdom and well-being (living happier with clarity and agency).
-- exercise: 4-8 sentences describing a concrete philosophical practice or protocol (e.g., reframing steps, dichotomy of control, journaling prompts, or view-from-above) that supports well-being and is suitable for immediate use.
-- disclaimer: one sentence inviting the user to verify the passage in their preferred edition/translation and noting that copyrighted texts are summarized.
+- reflection: a 300-500 {lang_unit} philosophical reflection tailored to the user's situation, emphasizing practical wisdom and well-being (clarity, agency, steadiness).
+- exercise: 4-8 sentences describing a concrete practice or protocol (e.g., reframing steps, dichotomy of control, journaling prompts, view-from-above) suitable for immediate use.
+- disclaimer: one concise sentence reminding the user that summaries may differ by edition/translation and encouraging verification.
 
 Use the requested language for everything.
 """
@@ -99,7 +86,6 @@ def build_messages(q: ComfortQuery) -> List[Dict[str, str]]:
         background=(getattr(q, "philosophy_background", None) or "philosophy"),
         situation=q.situation,
         guidance=q.guidance or "None",
-        max_passages=max(1, min(q.max_passages, 10)),
         lang_unit=lang_unit,
     )
     return [
@@ -130,26 +116,13 @@ def get_comfort_from_openai(q: ComfortQuery, *, openai_client: Optional[OpenAI] 
         
         data = json.loads(content)
 
-        # Constraint: Trim passages count and short quote length to avoid copyright/length issues
-        max_passages = max(1, min(q.max_passages, 10))
-        passages = (data.get("passages") or [])[:max_passages]
-        for p in passages:
-            sq = (p.get("short_quote") or "").strip()
-            if q.language.startswith("zh"):
-                if len(sq) > 40:
-                    p["short_quote"] = ""
-            else:
-                if len(sq.split()) > 20:
-                    p["short_quote"] = ""
-        data["passages"] = passages
-
         # Ensure other required fields have default values if missing from LLM response
         data.setdefault("reflection", "")
         data.setdefault("exercise", "")
 
         if not data.get("disclaimer"):
             data["disclaimer"] = (
-                "Please verify passages in your preferred edition/translation; non-public-domain texts are summarized, and this is supportive guidance only."
+                "Please verify sources in your preferred edition/translation; non-public-domain texts are summarized, and this is supportive guidance only."
             )
         
         return data

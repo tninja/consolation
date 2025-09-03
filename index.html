@@ -42,10 +42,6 @@
           <option value="en">English</option>
         </select>
       </div>
-      <div>
-        <label for="max_passages" id="passagesLabel"></label>
-        <input type="number" id="max_passages" value="3" min="1" max="10" style="width: 60px;" />
-      </div>
     </div>
 
     <label for="sit" id="situationLabel"></label>
@@ -80,9 +76,8 @@
       const translations = {
         zh: {
           title: "哲学的慰藉",
-          intro: "请输入你的处境，我们将提供哲学段落、反思与练习。",
+          intro: "请输入你的处境，我们将提供哲学反思与练习。",
           langLabel: "语言",
-          passagesLabel: "段落数",
           situationLabel: "处境描述",
           situationPlaceholder: "写下你正在经历的事，例如：项目延期、担心裁员、照顾孩子压力……",
           guidanceLabel: "额外引导（可选）",
@@ -92,7 +87,6 @@
           errorSituation: "请先填写处境描述。",
           errorRequestFailed: "请求失败：",
           footer: "前端托管在 GitHub Pages，后端由 FastAPI（Render）提供。",
-          passagesTitle: "推荐段落",
           reflectionTitle: "哲学反思",
           exerciseTitle: "练习步骤",
           playReflection: "播放反思",
@@ -102,9 +96,8 @@
         },
         en: {
           title: "The Consolations of Philosophy",
-          intro: "Describe your situation; we will suggest philosophical passages/ideas, a short reflection, and a practical exercise.",
+          intro: "Describe your situation; we will provide a short philosophical reflection and a practical exercise.",
           langLabel: "Language",
-          passagesLabel: "Passages",
           situationLabel: "Describe your situation",
           situationPlaceholder: "Write what you are going through, e.g., project delays, fear of layoffs, caregiving stress...",
           guidanceLabel: "Additional guidance (optional)",
@@ -114,7 +107,6 @@
           errorSituation: "Please enter your situation first.",
           errorRequestFailed: "Request failed: ",
           footer: "Frontend on GitHub Pages - Backend by FastAPI (Render).",
-          passagesTitle: "Recommended Passages",
           reflectionTitle: "Reflection",
           exerciseTitle: "Exercise",
           playReflection: "Play Reflection",
@@ -129,7 +121,6 @@
         document.title = t.title;
         el('intro').textContent = t.intro;
         el('langLabel').textContent = t.langLabel;
-        el('passagesLabel').textContent = t.passagesLabel;
         el('situationLabel').textContent = t.situationLabel;
         el('sit').placeholder = t.situationPlaceholder;
         el('guidanceLabel').textContent = t.guidanceLabel;
@@ -150,8 +141,7 @@
         const body = {
           language: lang,
           situation: el('sit').value.trim(),
-          guidance: el('guide').value.trim(),
-          max_passages: parseInt(el('max_passages').value, 10) || 3
+          guidance: el('guide').value.trim()
         };
         if (!body.situation) {
           err.textContent = t.errorSituation;
@@ -185,21 +175,12 @@
 
       function renderResult(data, lang) {
         const t = translations[lang];
-        const passages = data.passages || [];
         const reflection = data.reflection || '';
         const exercise = data.exercise || '';
         const disclaimer = data.disclaimer || '';
 
         const h = [];
-        if (passages.length) {
-          h.push(`<h2>${t.passagesTitle}</h2>`);
-          passages.forEach(p => {
-            const quote = p.short_quote ? ` - <em>${escapeHtml(p.short_quote)}</em>` : '';
-            const reason = p.reason ? `<div class="muted">${escapeHtml(p.reason)}</div>` : '';
-            const full_text = p.full_passage_text ? `<pre style="margin-top: .5rem;">${escapeHtml(p.full_passage_text)}</pre>` : '';
-            h.push(`<div class="passage"><strong>${escapeHtml(p.ref)}</strong>${quote}${reason}${full_text}</div>`);
-          });
-        }
+        // Passages rendering omitted by design.
         if (reflection) {
           h.push(`<h2>${t.reflectionTitle}</h2>`);
           h.push(`<pre id="reflectionText">${escapeHtml(reflection)}</pre>`);

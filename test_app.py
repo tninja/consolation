@@ -20,9 +20,8 @@ class TestComfort(unittest.TestCase):
         q = app.ComfortQuery(
             language="en",
             situation="I feel anxious about uncertainty in my job search.",
-            philosophy_background="stoicism",
-            max_passages=1,
-            guidance="focus on dichotomy of control; concise",
+            philosophy_background="philosophy",
+            guidance="prioritize reflection and an actionable exercise; concise",
         )
 
         data = app.get_comfort_from_openai(q)
@@ -30,16 +29,8 @@ class TestComfort(unittest.TestCase):
 
         # Basic shape checks
         self.assertIsInstance(data, dict)
-        for key in ("passages", "reflection", "exercise", "disclaimer"):
+        for key in ("reflection", "exercise", "disclaimer"):
             self.assertIn(key, data)
-
-        self.assertIsInstance(data["passages"], list)
-        self.assertLessEqual(len(data["passages"]), 1)
-        if data["passages"]:
-            p = data["passages"][0]
-            for k in ("ref", "short_quote", "reason", "full_passage_text"):
-                self.assertIn(k, p)
-            self.assertIsInstance(p["ref"], str)
 
         self.assertIsInstance(data["reflection"], str)
         self.assertIsInstance(data["exercise"], str)
