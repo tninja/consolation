@@ -1,2 +1,2 @@
 # consolation
-Providing consolation to user with Philosophy / Religion / Psychology
+Providing Consolation with Philosophy / Religion / Psychology
