@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Consolations of Philosophy</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft Yahei", sans-serif;
+      margin: 2rem auto;
+      max-width: 760px;
+      padding: 0 1rem;
+      background-image: url('background.png');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-repeat: no-repeat;
+    }
+    h1 { margin-bottom: .25rem; text-shadow: 0 1px 2px rgba(255,255,255,0.7); }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin: 16px 0; box-shadow: 0 1px 2px rgba(0,0,0,.04); background-color: rgba(255, 255, 255, 0.9); }
+    label { display:block; font-weight:600; margin:.5rem 0 .25rem; }
+    input, textarea, select { width: 100%; padding: .6rem .75rem; border: 1px solid #e5e7eb; border-radius: 10px; outline: none; }
+    button { cursor:pointer; padding: .7rem 1rem; border-radius: 999px; border: 0; background:#111827; color:#fff; font-weight:600; }
+    button[disabled] { opacity:.6; cursor:not-allowed; }
+    .row { display:flex; gap:.75rem; align-items:center; }
+    .muted { color:#6b7280; font-size:.9rem; text-shadow: 0 1px 2px rgba(255,255,255,0.7); }
+    .passage { padding:.5rem .75rem; border-left:4px solid #11182710; background:#f9fafb; border-radius:8px; margin:.5rem 0; }
+    .error { color:#b91c1c; font-weight:600; background-color: rgba(255, 255, 255, 0.85); padding: .5rem; border-radius: 8px; }
+    pre { white-space:pre-wrap; word-break:break-word; }
+    .footer { color:#374151; font-size:.85rem; margin-top:2rem; text-shadow: 0 1px 2px rgba(255,255,255,0.7); }
+  </style>
+</head>
+<body>
+  <div class="muted" id="intro"></div>
+
+  <div class="card">
+    <div class="row">
+      <div style="flex-grow:1">
+        <label for="language" id="langLabel"></label>
+        <select id="language">
+          <option value="zh" selected>Chinese</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div>
+        <label for="max_passages" id="passagesLabel"></label>
+        <input type="number" id="max_passages" value="3" min="1" max="10" style="width: 60px;" />
+      </div>
+    </div>
+
+    <label for="sit" id="situationLabel"></label>
+    <textarea id="sit" rows="5"></textarea>
+
+    <label for="guide" id="guidanceLabel"></label>
+    <input id="guide" />
+
+    <div class="row" style="margin-top:.75rem">
+      <button id="go"></button>
+      <span id="status" class="muted"></span>
+    </div>
+  </div>
+
+  <div id="result" class="card" style="display:none"></div>
+  <div id="err" class="error"></div>
+
+  <div class="footer" id="footer"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const API_BASE = "https://consolation-api.onrender.com";
+
+      const el = (id) => document.getElementById(id);
+      const btn = el('go');
+      const out = el('result');
+      const err = el('err');
+      const status = el('status');
+      const langSelect = el('language');
+      const ttsCache = { refl: null, ex: null };
+
+      const translations = {
+        zh: {
+          title: "哲学的慰藉",
+          intro: "请输入你的处境，我们将提供哲学段落、反思与练习。",
+          langLabel: "语言",
+          passagesLabel: "段落数",
+          situationLabel: "处境描述",
+          situationPlaceholder: "写下你正在经历的事，例如：项目延期、担心裁员、照顾孩子压力……",
+          guidanceLabel: "额外引导（可选）",
+          guidancePlaceholder: "例如：关注幸福哲学；尝试斯多噶练习；偏向行动建议",
+          buttonText: "获取安慰",
+          statusGenerating: "生成中，请稍候（约 10 秒）...",
+          errorSituation: "请先填写处境描述。",
+          errorRequestFailed: "请求失败：",
+          footer: "前端托管在 GitHub Pages，后端由 FastAPI（Render）提供。",
+          passagesTitle: "推荐段落",
+          reflectionTitle: "哲学反思",
+          exerciseTitle: "练习步骤",
+          playReflection: "播放反思",
+          playExercise: "播放练习",
+          downloadMp3: "下载 MP3",
+          ttsFailedPrefix: "语音合成失败："
+        },
+        en: {
+          title: "The Consolations of Philosophy",
+          intro: "Describe your situation; we will suggest philosophical passages/ideas, a short reflection, and a practical exercise.",
+          langLabel: "Language",
+          passagesLabel: "Passages",
+          situationLabel: "Describe your situation",
+          situationPlaceholder: "Write what you are going through, e.g., project delays, fear of layoffs, caregiving stress...",
+          guidanceLabel: "Additional guidance (optional)",
+          guidancePlaceholder: "e.g., focus on well-being philosophy; try Stoic practices; emphasize actionables",
+          buttonText: "Get comfort",
+          statusGenerating: "Generating, please wait (~10s)...",
+          errorSituation: "Please enter your situation first.",
+          errorRequestFailed: "Request failed: ",
+          footer: "Frontend on GitHub Pages - Backend by FastAPI (Render).",
+          passagesTitle: "Recommended Passages",
+          reflectionTitle: "Reflection",
+          exerciseTitle: "Exercise",
+          playReflection: "Play Reflection",
+          playExercise: "Play Exercise",
+          downloadMp3: "Download MP3",
+          ttsFailedPrefix: "TTS failed: "
+        }
+      };
+
+      function updateUI(lang) {
+        const t = translations[lang];
+        document.title = t.title;
+        el('intro').textContent = t.intro;
+        el('langLabel').textContent = t.langLabel;
+        el('passagesLabel').textContent = t.passagesLabel;
+        el('situationLabel').textContent = t.situationLabel;
+        el('sit').placeholder = t.situationPlaceholder;
+        el('guidanceLabel').textContent = t.guidanceLabel;
+        el('guide').placeholder = t.guidancePlaceholder;
+        btn.textContent = t.buttonText;
+        el('footer').textContent = t.footer;
+        document.documentElement.lang = lang.startsWith('zh') ? 'zh-CN' : 'en';
+      }
+
+      async function fetchComfort() {
+        const lang = langSelect.value;
+        const t = translations[lang];
+
+        err.textContent = "";
+        out.style.display = 'none';
+        out.innerHTML = '';
+
+        const body = {
+          language: lang,
+          situation: el('sit').value.trim(),
+          guidance: el('guide').value.trim(),
+          max_passages: parseInt(el('max_passages').value, 10) || 3
+        };
+        if (!body.situation) {
+          err.textContent = t.errorSituation;
+          return;
+        }
+
+        btn.disabled = true;
+        status.textContent = t.statusGenerating;
+
+        try {
+          const res = await fetch(`${API_BASE}/comfort`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`HTTP ${res.status}: ${text}`);
+          }
+          const data = await res.json();
+          renderResult(data, lang);
+        } catch (e) {
+          console.error(e);
+          err.textContent = t.errorRequestFailed + (e.message || e);
+          console.log('Fetch failed detail =>', e);
+        } finally {
+          btn.disabled = false;
+          status.textContent = '';
+        }
+      }
+
+      function renderResult(data, lang) {
+        const t = translations[lang];
+        const passages = data.passages || [];
+        const reflection = data.reflection || '';
+        const exercise = data.exercise || '';
+        const disclaimer = data.disclaimer || '';
+
+        const h = [];
+        if (passages.length) {
+          h.push(`<h2>${t.passagesTitle}</h2>`);
+          passages.forEach(p => {
+            const quote = p.short_quote ? ` - <em>${escapeHtml(p.short_quote)}</em>` : '';
+            const reason = p.reason ? `<div class="muted">${escapeHtml(p.reason)}</div>` : '';
+            const full_text = p.full_passage_text ? `<pre style="margin-top: .5rem;">${escapeHtml(p.full_passage_text)}</pre>` : '';
+            h.push(`<div class="passage"><strong>${escapeHtml(p.ref)}</strong>${quote}${reason}${full_text}</div>`);
+          });
+        }
+        if (reflection) {
+          h.push(`<h2>${t.reflectionTitle}</h2>`);
+          h.push(`<pre id="reflectionText">${escapeHtml(reflection)}</pre>`);
+          h.push(`<div class="row" style="margin-top:.5rem">`
+            + `<button id=\"playRefl\">${t.playReflection}</button>`
+            + `<audio id=\"audioRefl\" controls style=\"display:none\"></audio>`
+            + `<a id=\"downloadRefl\" style=\"display:none; margin-left:.5rem\" download=\"reflection.mp3\">${t.downloadMp3}</a>`
+            + `</div>`);
+        }
+        if (exercise) {
+          h.push(`<h2>${t.exerciseTitle}</h2>`);
+          h.push(`<pre id="exerciseText">${escapeHtml(exercise)}</pre>`);
+          h.push(`<div class="row" style="margin-top:.5rem">`
+            + `<button id=\"playEx\">${t.playExercise}</button>`
+            + `<audio id=\"audioEx\" controls style=\"display:none\"></audio>`
+            + `<a id=\"downloadEx\" style=\"display:none; margin-left:.5rem\" download=\"exercise.mp3\">${t.downloadMp3}</a>`
+            + `</div>`);
+        }
+        if (disclaimer) {
+          h.push(`<div class="muted">${escapeHtml(disclaimer)}</div>`);
+        }
+
+        out.innerHTML = h.join('\n');
+        out.style.display = 'block';
+
+        // Attach TTS handlers
+        const playRefl = document.getElementById('playRefl');
+        const playEx = document.getElementById('playEx');
+        if (playRefl) {
+          playRefl.addEventListener('click', async () => {
+            const text = (document.getElementById('reflectionText')?.textContent || '').trim();
+            if (ttsCache.refl) {
+              const audio = document.getElementById('audioRefl');
+              const link = document.getElementById('downloadRefl');
+              audio.src = ttsCache.refl;
+              audio.style.display = 'block';
+              if (link) { link.href = ttsCache.refl; link.style.display = 'inline-block'; }
+              try { await audio.play(); } catch (_) {}
+            } else {
+              await synthesizeAndPlay(text, lang, 'audioRefl', 'downloadRefl', playRefl);
+            }
+          });
+        }
+        if (playEx) {
+          playEx.addEventListener('click', async () => {
+            const text = (document.getElementById('exerciseText')?.textContent || '').trim();
+            if (ttsCache.ex) {
+              const audio = document.getElementById('audioEx');
+              const link = document.getElementById('downloadEx');
+              audio.src = ttsCache.ex;
+              audio.style.display = 'block';
+              if (link) { link.href = ttsCache.ex; link.style.display = 'inline-block'; }
+              try { await audio.play(); } catch (_) {}
+            } else {
+              await synthesizeAndPlay(text, lang, 'audioEx', 'downloadEx', playEx);
+            }
+          });
+        }
+
+        // Pre-generate audio in background to save time
+        if (reflection) {
+          const text = (document.getElementById('reflectionText')?.textContent || '').trim();
+          synthesizeToCache(text, lang, 'audioRefl', 'downloadRefl', 'refl');
+        }
+        if (exercise) {
+          const text = (document.getElementById('exerciseText')?.textContent || '').trim();
+          synthesizeToCache(text, lang, 'audioEx', 'downloadEx', 'ex');
+        }
+      }
+
+      function escapeHtml(str){
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        };
+        return String(str).replace(/[&<"']/g, s => map[s]);
+      }
+
+      btn.addEventListener('click', fetchComfort);
+      langSelect.addEventListener('change', (e) => {
+        const v = e.target.value;
+        try { localStorage.setItem('preferredLang', v); } catch (_) {}
+        updateUI(v);
+      });
+
+      // Detect default language from last saved value or browser setting
+      function detectDefaultLanguage() {
+        try {
+          const saved = localStorage.getItem('preferredLang');
+          if (saved === 'zh' || saved === 'en') return saved;
+        } catch (_) {}
+        const nav = navigator;
+        const candidates = [];
+        if (nav.languages && Array.isArray(nav.languages)) candidates.push(...nav.languages);
+        if (nav.language) candidates.push(nav.language);
+        const found = (candidates.find(l => String(l).toLowerCase().startsWith('zh')) ? 'zh' : 'en');
+        return found;
+      }
+
+      // Initial UI setup with detected default
+      const defaultLang = detectDefaultLanguage();
+      langSelect.value = defaultLang;
+      updateUI(defaultLang);
+
+      async function synthesizeAndPlay(text, lang, audioId, linkId, buttonEl) {
+        if (!text) return;
+        try {
+          if (buttonEl) buttonEl.disabled = true;
+          const res = await fetch(`${API_BASE}/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language: lang, format: 'mp3' })
+          });
+          if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(`HTTP ${res.status}: ${msg}`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const audio = document.getElementById(audioId);
+          const link = document.getElementById(linkId);
+          if (audio) {
+            audio.src = url;
+            audio.style.display = 'block';
+            try { await audio.play(); } catch (_) {}
+          }
+          if (link) {
+            link.href = url;
+            link.style.display = 'inline-block';
+          }
+        } catch (e) {
+          console.error('TTS error', e);
+          const lang = langSelect.value;
+          const t = translations[lang];
+          err.textContent = (t.ttsFailedPrefix || 'TTS failed: ') + (e.message || e);
+        } finally {
+          if (buttonEl) buttonEl.disabled = false;
+        }
+      }
+
+      async function synthesizeToCache(text, lang, audioId, linkId, cacheKey) {
+        if (!text) return;
+        try {
+          const res = await fetch(`${API_BASE}/tts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language: lang, format: 'mp3' })
+          });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          ttsCache[cacheKey] = url;
+          // Pre-bind sources but do not reveal controls yet
+          const audio = document.getElementById(audioId);
+          const link = document.getElementById(linkId);
+          if (audio) { audio.src = url; }
+          if (link) { link.href = url; }
+        } catch (_) {
+          // ignore background errors
+        }
+      }
+    });
+  </script>
+</body>
+</html>
