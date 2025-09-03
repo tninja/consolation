@@ -26,7 +26,7 @@ app = FastAPI(title="Philosophy Comfort API (OpenAI SDK)")
 # Change to your GitHub Pages domain (user page and/or project page)
 ALLOWED_ORIGINS = [
     "https://tninja.github.io",
-    "https://tninja.github.io/fastapi-helloworld"
+    "https://tninja.github.io/consolation"
 ]
 
 app.add_middleware(
