@@ -1,0 +1,12 @@
+
+* [[https://tninja.github.io/fastapi-helloworld/][A Ray of Light, A Word of Grace: Comfort Scriptures Assistant]]
+
+- Describe your situation, and we will provide relevant scripture references, a short devotional, and a prayer.
+
+* [[https://tninja.github.io/consolation/][The Consolations of Philosophy]]
+
+- Describe your situation; we will provide a warm, gentle philosophical reflection and a soft, easy-to-try exercise.
+
+* Infrastructure
+
+- Frontend hosted on GitHub Pages · Backend powered by FastAPI ([[https://dashboard.render.com/web/srv-d2n7rtv5r7bs73f7gpj0][Render]]).
