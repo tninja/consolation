@@ -74,7 +74,7 @@ Situation detail: {situation}
 Additional guidance: {guidance}
 
 Return JSON with fields:
-- reflection: a 500-1000 {lang_unit} philosophical reflection tailored to the user's situation; open with empathy and normalization; keep a warm, soothing tone; avoid lecturing; use soft invitations and plain language.
+- reflection: a 500-700 {lang_unit} philosophical reflection tailored to the user's situation; open with empathy and normalization; keep a warm, soothing tone; avoid lecturing; use soft invitations and plain language.
 - exercise: 4-8 sentences describing a gentle, invitation-style practice (e.g., a few breaths, a soft reframing, journaling prompts, view-from-above) that can be done in 2–5 minutes; mark steps as optional where helpful; end with one sentence of reassurance.
 - disclaimer: one concise sentence reminding the user that summaries may differ by edition/translation and encouraging verification.
 
