@@ -3,7 +3,7 @@
 
 - Describe your situation, and we will provide relevant scripture references, a short devotional, and a prayer.
 
-* [[https://tninja.github.io/consolation/][The Consolations of Philosophy]]
+* [[https://tninja.github.io/fastapi-helloworld/philosophy.html][The Consolations of Philosophy]]
 
 - Describe your situation; we will provide a warm, gentle philosophical reflection and a soft, easy-to-try exercise.
 
